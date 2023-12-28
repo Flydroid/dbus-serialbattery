@@ -15,9 +15,9 @@ import crcmod
 
 
 
-class BatteryTemplate(Battery):
+class CSB_Interface(Battery):
     def __init__(self, port, baud, address):
-        super(BatteryTemplate, self).__init__(port, baud, address)
+        super(CSB_Interface, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
 
     BATTERYTYPE = "NV GenD"
@@ -36,6 +36,7 @@ class BatteryTemplate(Battery):
         try:
             result = self.read_status_data()
             # get first data to show in startup log, only if result is true
+            logger.info(result)
             if result:
                 self.refresh_data()
         except Exception as err:
@@ -48,18 +49,14 @@ class BatteryTemplate(Battery):
         # After successful  connection get_settings will be call to set up the battery.
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-
+        self.cell_count=12
         self.capacity = (
             utils.BATTERY_CAPACITY  # if possible replace constant with value read from BMS
         )
-        self.max_battery_charge_current = (
-            utils.MAX_BATTERY_CHARGE_CURRENT  # if possible replace constant with value read from BMS
-        )
-        self.max_battery_discharge_current = (
-            utils.MAX_BATTERY_DISCHARGE_CURRENT  # if possible replace constant with value read from BMS
-        )
-        self.max_battery_voltage = utils.MAX_CELL_VOLTAGE * self.cell_count
-        self.min_battery_voltage = utils.MIN_CELL_VOLTAGE * self.cell_count
+        self.max_battery_charge_current = 30
+        self.max_battery_discharge_current = 30
+        self.max_battery_voltage = 4.1
+        self.min_battery_voltage = 3.0
 
         # provide a unique identifier from the BMS to identify a BMS, if multiple same BMS are connected
         # e.g. the serial number
@@ -72,60 +69,71 @@ class BatteryTemplate(Battery):
         # call all functions that will refresh the battery data.
         # This will be called for every iteration (1 second)
         # Return True if success, False for failure
-        result = self.read_soc_data()
+        result = self.read_cell_data()
 
         return result
 
     def read_status_data(self):
-        status_data = self.read_serial_data_template(self.command_status)
+        status_data = self.read_serial_data()
         # check if connection success
         if status_data is False:
             return False
 
-        (
-            self.cell_count,
-            self.temp_sensors,
-            self.charger_connected,
-            self.load_connected,
-            state,
-            self.cycles,
-        ) = unpack_from(">bb??bhx", status_data)
+        # (
+        #     self.cell_count,
+        #     self.temp_sensors,
+        #     self.charger_connected,
+        #     self.load_connected,
+        #     state,
+        #     self.cycles,
+        # ) = unpack_from(">bb??bhx", status_data)
 
-        self.hardware_version = "TemplateBMS " + str(self.cell_count) + " cells"
+        self.hardware_version = "CSB-Interface rev3"
         logger.info(self.hardware_version)
         return True
 
-    def read_soc_data(self):
-        soc_data = self.read_serial_data_template(self.command_soc)
+    def read_cell_data(self):
+        cell_data = self.read_serial_data()
+        logger.info(cell_data)
         # check if connection success
-        if soc_data is False:
+        if cell_data is False:
             return False
 
-        voltage, current, soc = unpack_from(">hxxhh", soc_data)
-        self.voltage = voltage / 10
-        self.current = current / -10
-        self.soc = soc / 10
+        voltages,temps = self.get_VoltsAndTemps(cell_data)
+
+        self.cells = voltages
+        self.temp1 = temps[0]
+        self.temp2 = temps[1]
+        self.temp3 = temps[2]
+        self.temp4 = temps[3]
+        self.voltage = sum(self.cells)
+        self.current = 0
+        self.soc = 0
+
+        logger.info("Cells %s",self.cells)
+        logger.info("temp1 %s",self.temp1)
+        logger.info("temp2 %s",self.temp2)
+        logger.info("temp3 %s",self.temp3)
+        logger.info("temp4 %s",self.temp4)
+
         return True
 
-    def read_serial_data_template(self, command):
+    def read_serial_data(self):
         SERIAL_SOF = [0x1a, 0x85]
         SERIAL_EOF = [0x22, 0xCE]
 
-        
         # use the read_serial_data() function to read the data and then do BMS spesific checks (crc, start bytes, etc)
-        buffer = read_serial_data(
-            command, self.port, self.baud_rate, self.LENGTH_POS, self.LENGTH_CHECK,self.LENGTH_FIXED,self.LENGTH_SIZE
-        )
+        buffer = read_serial_data(0, self.port, self.baud_rate, self.LENGTH_POS, self.LENGTH_CHECK,self.LENGTH_FIXED,self.LENGTH_SIZE)
         if buffer is False:
             logger.error(">>> ERROR: No reply - returning")
             return False
-
         sof = buffer.find(bytearray(SERIAL_SOF),) 
         eof = sof+ buffer[sof:].find(bytearray(SERIAL_EOF))
         raw_frame = buffer[sof:eof+2]
 
         if self.check_crc(raw_frame) == 1:
             frame = self.get_data_from_frame(raw_frame) # remove sof, eof and crc
+            
             return frame
         else:
             logger.error(">>> ERROR: CRC Doesn't Match")
@@ -134,7 +142,7 @@ class BatteryTemplate(Battery):
     # Calculates and compares the CRC of a given frame starting by an SOF and finishing by an EOF
     # Returns  1 if matching CRC
     # Returns  0 else
-    def check_crc(frame):
+    def check_crc(self,frame):
         data_crc = frame[2:-2] # remove sof and eof to get data + crc
         crc_retrieved = data_crc[len(data_crc) - 2:]  # Where 2 is the length of the CRC
         data = data_crc[:len(data_crc) - 2]  # Getting rid of the CRC
@@ -150,19 +158,22 @@ class BatteryTemplate(Battery):
 
 
     # Returns the bytearray without EOF and SOF
-    def get_data_from_frame(frame):
+    def get_data_from_frame(self,frame):
         # Striping the frame of the EOF, CRC and SOF :
-        framed = frame[5:-4]  # Getting rid of the SOF and of 
+        data = frame[5:-4]  # Getting rid of the SOF and of 
 
-        return framed
+        return data
 
 
     # Returns the list of voltages
-    def read_voltages(data):
-        voltage = []
+    def get_VoltsAndTemps(self,data):
+        values = []
         while len(data) > 0:
-            volt = data[:2]  # Reading 2 first bytes
-            int_volt = int.from_bytes(volt, byteorder='big', signed=True)
-            voltage.append(int_volt)  # Converting the from hex to int
+            value = data[:2]  # Reading 2 first bytes
+            int_value = int.from_bytes(value, byteorder='big', signed=True)
+            values.append(int_value)  # Converting the from hex to int
             data = data[2:]  # Getting rid of the 2 first bytes
-        return voltage
+        logger.info("get_VoltsAndTemps:Values %s",values)
+        voltages = values[0:12]
+        temps= values[12:20]
+        return voltages,temps

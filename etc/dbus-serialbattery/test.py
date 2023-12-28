@@ -1,19 +1,10 @@
 import utils
 import binascii
 import crcmod
+from time import sleep
 
 SERIAL_SOF = [0x1a, 0x85]
 SERIAL_EOF = [0x22, 0xCE]
-
-# Returns the CRC value (int)
-# Be sure to input a bytearray and not a hexlified value
-def compute_crc(data):
-    # Setting up the polynomial
-    CRC16_CCITT = crcmod.Crc(0x11021, initCrc=0xFFFF, rev=False, xorOut=0x0000)
-    data = binascii.hexlify(data)
-    CRC16_CCITT.update(binascii.a2b_hex(data))  # Calculates the CRC on the given data
-
-    return CRC16_CCITT.crcValue
 
 # Calculates and compares the CRC of a given frame starting by an SOF and finishing by an EOF
 # Returns  1 if matching CRC
@@ -23,7 +14,10 @@ def check_crc(frame):
     crc_retrieved = data_crc[len(data_crc) - 2:]  # Where 2 is the length of the CRC
     data = data_crc[:len(data_crc) - 2]  # Getting rid of the CRC
     # Calculating the CRC of the data in the frame
-    crc_computed = compute_crc(data)
+    CRC16_CCITT = crcmod.Crc(0x11021, initCrc=0xFFFF, rev=False, xorOut=0x0000)
+    data = binascii.hexlify(data)
+    CRC16_CCITT.update(binascii.a2b_hex(data))  # Calculates the CRC on the given data
+    crc_computed = CRC16_CCITT.crcValue
 
     crc_retrieved = int.from_bytes(crc_retrieved, byteorder='big', signed=False)  # Converting from hex to int
 
@@ -33,7 +27,7 @@ def check_crc(frame):
 # Returns the bytearray without EOF and SOF
 def get_data_from_frame(frame):
     # Striping the frame of the EOF, CRC and SOF :
-    framed = frame[2:-4]  # Getting rid of the SOF and of 
+    framed = frame[5:-4]  # Getting rid of the SOF and of 
 
     return framed
 
@@ -49,7 +43,8 @@ def read_voltages(data):
     return voltage
 
 
-ser = utils.open_serial_port("COM5",115200)
+ser = utils.open_serial_port("COM4",115200)
+sleep(1)
 buffer = utils.read_serialport_data(ser,0,length_pos=0,length_check=0, length_fixed=73)
 print(buffer)
 ser.close()
@@ -62,7 +57,7 @@ raw_frame = buffer[sof:eof+2]
 
 if check_crc(raw_frame) == 1:
     frame = get_data_from_frame(raw_frame) # remove sof, eof and crc
-    print(frame[2:])
-    print(read_voltages(frame[3:]))
+    print(frame)
+    print(read_voltages(frame))
 else:
     print("CRC missmatch")
