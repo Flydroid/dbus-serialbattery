@@ -1,179 +1,242 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
+from typing import Union
 
-# NOTES
-# Please see "Add/Request a new BMS" https://louisvdw.github.io/dbus-serialbattery/general/supported-bms#add-by-opening-a-pull-request
-# in the documentation for a checklist what you have to do, when adding a new BMS
+from time import sleep
+from dbus.mainloop.glib import DBusGMainLoop
 
-# avoid importing wildcards
-from battery import Protection, Battery, Cell
-from utils import is_bit_set, read_serial_data, logger
+import sys
+
+if sys.version_info.major == 2:
+    import gobject
+else:
+    from gi.repository import GLib as gobject
+
+# Victron packages
+# from ve_utils import exit_on_error
+
+from dbushelper import DbusHelper
+from utils import logger
 import utils
-from struct import unpack_from
-import binascii
-import crcmod
+from battery import Battery
+
+# import battery classes
+from bms.daly import Daly
+from bms.ecs import Ecs
+from bms.heltecmodbus import HeltecModbus
+from bms.hlpdatabms4s import HLPdataBMS4S
+from bms.jkbms import Jkbms
+from bms.lifepower import Lifepower
+from bms.lltjbd import LltJbd
+from bms.renogy import Renogy
+from bms.seplos import Seplos
+from bms.csb_interface import CSB_Interface
+
+# enabled only if explicitly set in config under "BMS_TYPE"
+if "ANT" in utils.BMS_TYPE:
+    from bms.ant import ANT
+if "MNB" in utils.BMS_TYPE:
+    from bms.mnb import MNB
+if "Sinowealth" in utils.BMS_TYPE:
+    from bms.sinowealth import Sinowealth
+
+supported_bms_types = [
+    {"bms": Daly, "baud": 9600, "address": b"\x40"},
+    {"bms": Daly, "baud": 9600, "address": b"\x80"},
+    {"bms": Ecs, "baud": 19200},
+    {"bms": HeltecModbus, "baud": 9600},
+    {"bms": HLPdataBMS4S, "baud": 9600},
+    {"bms": Jkbms, "baud": 115200},
+    {"bms": Lifepower, "baud": 9600},
+    {"bms": LltJbd, "baud": 9600},
+    {"bms": Renogy, "baud": 9600, "address": b"\x30"},
+    {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
+    {"bms": Seplos, "baud": 19200},
+    {"bms": CSB_Interface, "baud":115200},
+]
+
+# enabled only if explicitly set in config under "BMS_TYPE"
+if "ANT" in utils.BMS_TYPE:
+    supported_bms_types.append({"bms": ANT, "baud": 19200})
+if "MNB" in utils.BMS_TYPE:
+    supported_bms_types.append({"bms": MNB, "baud": 9600})
+if "Sinowealth" in utils.BMS_TYPE:
+    supported_bms_types.append({"bms": Sinowealth, "baud": 9600})
+
+expected_bms_types = [
+    battery_type 
+    for battery_type in supported_bms_types
+    if battery_type["bms"].__name__ in utils.BMS_TYPE or len(utils.BMS_TYPE) == 0
+]
+logger.debug("Expected BMS Types: %s",expected_bms_types)
+
+logger.info("")
+logger.info("Starting dbus-serialbattery")
 
 
+def main():
+    # NameError: free variable 'expected_bms_types' referenced before assignment in enclosing scope
+    global expected_bms_types
 
-
-class CSB_Interface(Battery):
-    def __init__(self, port, baud, address):
-        super(CSB_Interface, self).__init__(port, baud, address)
-        self.type = self.BATTERYTYPE
-
-    BATTERYTYPE = "NV GenD"
-    LENGTH_CHECK = 0
-    LENGTH_POS = 0 # expecting 73 bytes for each frame
-    LENGTH_SIZE = None
-    LENGTH_FIXED = 73
-
-
-
-    def test_connection(self):
-        # call a function that will connect to the battery, send a command and retrieve the result.
-        # The result or call should be unique to this BMS. Battery name or version, etc.
-        # Return True if success, False for failure
-        result = False
-        try:
-            result = self.read_status_data()
-            # get first data to show in startup log, only if result is true
-            logger.info(result)
-            if result:
-                self.refresh_data()
-        except Exception as err:
-            logger.error(f"Unexpected {err=}, {type(err)=}")
-            result = False
-
-        return result
-
-    def get_settings(self):
-        # After successful  connection get_settings will be call to set up the battery.
-        # Set the current limits, populate cell count, etc
-        # Return True if success, False for failure
-        self.cell_count=12
-        self.capacity = (
-            utils.BATTERY_CAPACITY  # if possible replace constant with value read from BMS
-        )
-        self.max_battery_charge_current = 30
-        self.max_battery_discharge_current = 30
-        self.max_battery_voltage = 4.1
-        self.min_battery_voltage = 3.0
-
-        # provide a unique identifier from the BMS to identify a BMS, if multiple same BMS are connected
-        # e.g. the serial number
-        # If there is no such value, please leave the line commented. In this case the capacity is used,
-        # since it can be changed by small amounts to make a battery unique. On +/- 5 Ah you can identify 11 batteries
-        # self.unique_identifier = str()
+    def poll_battery(loop):
+        helper.publish_battery(loop)
         return True
 
-    def refresh_data(self):
-        # call all functions that will refresh the battery data.
-        # This will be called for every iteration (1 second)
-        # Return True if success, False for failure
-        result = self.read_cell_data()
+    def get_battery(_port) -> Union[Battery, None]:
+        # all the different batteries the driver support and need to test for
+        # try to establish communications with the battery 3 times, else exit
+        retry = 1
+        retries = 3
+        while retry <= retries:
+            logger.info(
+                "-- Testing BMS: " + str(retry) + " of " + str(retries) + " rounds"
+            )
+            # create a new battery object that can read the battery and run connection test
+            logger.debug("Expected BMS Types: %s",expected_bms_types)
+            for test in expected_bms_types:
+                # noinspection PyBroadException
+                try:
+                    logger.info(
+                        "Testing "
+                        + test["bms"].__name__
+                        + (
+                            ' at address "'
+                            + utils.bytearray_to_string(test["address"])
+                            + '"'
+                            if "address" in test
+                            else ""
+                        )
+                    )
+                    batteryClass = test["bms"]
+                    baud = test["baud"]
+                    battery: Battery = batteryClass(
+                        port=_port, baud=baud, address=test.get("address")
+                    )
+                    if battery.test_connection() and battery.validate_data():
+                        logger.info(
+                            "Connection established to " + battery.__class__.__name__
+                        )
+                        return battery
+                except KeyboardInterrupt:
+                    return None
+                except Exception:
+                    (
+                        exception_type,
+                        exception_object,
+                        exception_traceback,
+                    ) = sys.exc_info()
+                    file = exception_traceback.tb_frame.f_code.co_filename
+                    line = exception_traceback.tb_lineno
+                    logger.error(
+                        f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}"
+                    )
+                    # Ignore any malfunction test_function()
+                    pass
+            retry += 1
+            sleep(0.5)
 
-        return result
+        return None
 
-    def read_status_data(self):
-        status_data = self.read_serial_data()
-        # check if connection success
-        if status_data is False:
-            return False
-
-        # (
-        #     self.cell_count,
-        #     self.temp_sensors,
-        #     self.charger_connected,
-        #     self.load_connected,
-        #     state,
-        #     self.cycles,
-        # ) = unpack_from(">bb??bhx", status_data)
-
-        self.hardware_version = "CSB-Interface rev3"
-        logger.info(self.hardware_version)
-        return True
-
-    def read_cell_data(self):
-        cell_data = self.read_serial_data()
-        logger.info(cell_data)
-        # check if connection success
-        if cell_data is False:
-            return False
-
-        voltages,temps = self.get_VoltsAndTemps(cell_data)
-
-        self.cells = voltages
-        self.temp1 = temps[0]
-        self.temp2 = temps[1]
-        self.temp3 = temps[2]
-        self.temp4 = temps[3]
-        self.voltage = sum(self.cells)
-        self.current = 0
-        self.soc = 0
-
-        logger.info("Cells %s",self.cells)
-        logger.info("temp1 %s",self.temp1)
-        logger.info("temp2 %s",self.temp2)
-        logger.info("temp3 %s",self.temp3)
-        logger.info("temp4 %s",self.temp4)
-
-        return True
-
-    def read_serial_data(self):
-        SERIAL_SOF = [0x1a, 0x85]
-        SERIAL_EOF = [0x22, 0xCE]
-
-        # use the read_serial_data() function to read the data and then do BMS spesific checks (crc, start bytes, etc)
-        buffer = read_serial_data(0, self.port, self.baud_rate, self.LENGTH_POS, self.LENGTH_CHECK,self.LENGTH_FIXED,self.LENGTH_SIZE)
-        if buffer is False:
-            logger.error(">>> ERROR: No reply - returning")
-            return False
-        sof = buffer.find(bytearray(SERIAL_SOF),) 
-        eof = sof+ buffer[sof:].find(bytearray(SERIAL_EOF))
-        raw_frame = buffer[sof:eof+2]
-
-        if self.check_crc(raw_frame) == 1:
-            frame = self.get_data_from_frame(raw_frame) # remove sof, eof and crc
-            
-            return frame
+    def get_port() -> str:
+        # Get the port we need to use from the argument
+        if len(sys.argv) > 1:
+            port = sys.argv[1]
+            if port not in utils.EXCLUDED_DEVICES:
+                return port
+            else:
+                logger.debug(
+                    "Stopping dbus-serialbattery: "
+                    + str(port)
+                    + " is excluded trough the config file"
+                )
+                sleep(60)
+                sys.exit(0)
         else:
-            logger.error(">>> ERROR: CRC Doesn't Match")
-            return False
+            # just for MNB-SPI
+            logger.info("No Port needed")
+            return "/dev/ttyUSB9"
 
-    # Calculates and compares the CRC of a given frame starting by an SOF and finishing by an EOF
-    # Returns  1 if matching CRC
-    # Returns  0 else
-    def check_crc(self,frame):
-        data_crc = frame[2:-2] # remove sof and eof to get data + crc
-        crc_retrieved = data_crc[len(data_crc) - 2:]  # Where 2 is the length of the CRC
-        data = data_crc[:len(data_crc) - 2]  # Getting rid of the CRC
-        # Calculating the CRC of the data in the frame
-        CRC16_CCITT = crcmod.Crc(0x11021, initCrc=0xFFFF, rev=False, xorOut=0x0000)
-        data = binascii.hexlify(data)
-        CRC16_CCITT.update(binascii.a2b_hex(data))  # Calculates the CRC on the given data
-        crc_computed = CRC16_CCITT.crcValue
+    logger.info("dbus-serialbattery v" + str(utils.DRIVER_VERSION))
 
-        crc_retrieved = int.from_bytes(crc_retrieved, byteorder='big', signed=False)  # Converting from hex to int
+    port = get_port()
+    battery = None
+    if port.endswith("_Ble") and len(sys.argv) > 2:
+        """
+        Import ble classes only, if it's a ble port, else the driver won't start due to missing python modules
+        This prevent problems when using the driver only with a serial connection
+        """
+        if port == "Jkbms_Ble":
+            # noqa: F401 --> ignore flake "imported but unused" error
+            from bms.jkbms_ble import Jkbms_Ble  # noqa: F401
 
-        return crc_computed == crc_retrieved
+        if port == "LltJbd_Ble":
+            # noqa: F401 --> ignore flake "imported but unused" error
+            from bms.lltjbd_ble import LltJbd_Ble  # noqa: F401
+
+        class_ = eval(port)
+        testbms = class_("", 9600, sys.argv[2])
+        if testbms.test_connection():
+            logger.info("Connection established to " + testbms.__class__.__name__)
+            battery = testbms
+    elif port.startswith("can"):
+        """
+        Import CAN classes only, if it's a can port, else the driver won't start due to missing python modules
+        This prevent problems when using the driver only with a serial connection
+        """
+        from bms.daly_can import Daly_Can
+        from bms.jkbms_can import Jkbms_Can
+
+        # only try CAN BMS on CAN port
+        supported_bms_types = [
+            {"bms": Daly_Can, "baud": 250000},
+            {"bms": Jkbms_Can, "baud": 250000},
+        ]
+
+        expected_bms_types = [
+            battery_type
+            for battery_type in supported_bms_types
+            if battery_type["bms"].__name__ in utils.BMS_TYPE
+            or len(utils.BMS_TYPE) == 0
+        ]
+
+        battery = get_battery(port)
+    else:
+        # wait some seconds to be sure that the serial connection is ready
+        # else the error throw a lot of timeouts
+        sleep(16)
+        battery = get_battery(port)
+
+    # exit if no battery could be found
+    if battery is None:
+        logger.error("ERROR >>> No battery connection at " + port)
+        sys.exit(1)
+
+    battery.log_settings()
+
+    # Have a mainloop, so we can send/receive asynchronous calls to and from dbus
+    DBusGMainLoop(set_as_default=True)
+    if sys.version_info.major == 2:
+        gobject.threads_init()
+    mainloop = gobject.MainLoop()
+
+    # Get the initial values for the battery used by setup_vedbus
+    helper = DbusHelper(battery)
+
+    if not helper.setup_vedbus():
+        logger.error("ERROR >>> Problem with battery set up at " + port)
+        sys.exit(1)
+
+    # try using active callback on this battery
+    if not battery.use_callback(lambda: poll_battery(mainloop)):
+        # if not possible, poll the battery every poll_interval milliseconds
+        gobject.timeout_add(battery.poll_interval, lambda: poll_battery(mainloop))
+
+    # Run the main loop
+    try:
+        mainloop.run()
+    except KeyboardInterrupt:
+        pass
 
 
-    # Returns the bytearray without EOF and SOF
-    def get_data_from_frame(self,frame):
-        # Striping the frame of the EOF, CRC and SOF :
-        data = frame[5:-4]  # Getting rid of the SOF and of 
-
-        return data
-
-
-    # Returns the list of voltages
-    def get_VoltsAndTemps(self,data):
-        values = []
-        while len(data) > 0:
-            value = data[:2]  # Reading 2 first bytes
-            int_value = int.from_bytes(value, byteorder='big', signed=True)
-            values.append(int_value)  # Converting the from hex to int
-            data = data[2:]  # Getting rid of the 2 first bytes
-        logger.info("get_VoltsAndTemps:Values %s",values)
-        voltages = values[0:12]
-        temps= values[12:20]
-        return voltages,temps
+if __name__ == "__main__":
+    main()
