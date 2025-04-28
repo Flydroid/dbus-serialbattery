@@ -44,6 +44,7 @@ from bms.pace import Pace
 from bms.renogy import Renogy
 from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
+from bms.csb_interface import CSB_Interface
 
 # add ext folder to sys.path
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
@@ -74,6 +75,7 @@ supported_bms_types = [
     {"bms": Renogy, "baud": 9600, "address": b"\xf7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
     {"bms": Seplosv3, "baud": 19200},
+    {"bms": CSB_Interface, "baud":115200},
 ]
 
 # enabled only if explicitly set in config under "BMS_TYPE"
