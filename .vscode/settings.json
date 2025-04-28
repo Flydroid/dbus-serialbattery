@@ -1,0 +1,12 @@
+{
+    "[python]": { "editor.formatOnSave": true },
+
+    "python.autoComplete.extraPaths": [
+        "dbus-serialbattery/ext",
+        "dbus-serialbattery/ext/velib_python",
+    ],
+    "python.analysis.extraPaths": [
+        "dbus-serialbattery/ext",
+        "dbus-serialbattery/ext/velib_python",
+    ]
+}
