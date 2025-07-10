@@ -116,6 +116,7 @@ if [ -z "$1" ]; then
         "specific branch (specific feature testing)"
         "specific version"
         "local tar file"
+        "Local Repo (use local dbus-serialbattery folder)"
         "quit"
     )
 
@@ -138,6 +139,9 @@ if [ -z "$1" ]; then
                 break
                 ;;
             "local tar file")
+                break
+                ;;
+            "Local Repo (use local dbus-serialbattery folder)")
                 break
                 ;;
             "quit")
@@ -164,6 +168,8 @@ if [ -z "$1" ]; then
         version="specific_version"
     elif [ "$version" = "local tar file" ]; then
         version="local"
+    elif [ "$version" = "Local Repo (use local dbus-serialbattery folder)" ]; then
+        version="local_repo"
     fi
 
 elif [ "$1" = "--stable" ]; then
@@ -386,6 +392,32 @@ if [ "$version" = "nightly" ] || [ "$version" = "specific_branch" ]; then
     rm /tmp/$branch.zip
     rm -rf /tmp/venus-os_dbus-serialbattery-$branch
 
+fi
+
+
+
+## local repo
+if [ "$version" = "local_repo" ]; then
+    echo "Using local dbus-serialbattery folder next to install.sh"
+    # backup config.ini
+    backup_config
+
+    # remove old driver
+    if [ -d "/data/apps/dbus-serialbattery" ]; then
+        rm -rf /data/apps/dbus-serialbattery
+    fi
+    if [ -d "/data/etc/dbus-serialbattery" ]; then
+        rm -rf /data/etc/dbus-serialbattery
+    fi
+
+    # copy local folder to /data/apps
+    if [ -d "$(dirname "$0")/dbus-serialbattery" ]; then
+        cp -a "$(dirname "$0")/dbus-serialbattery" /data/apps/
+    else
+        echo "ERROR: Local dbus-serialbattery folder not found next to install.sh"
+        restore_config
+        exit 1
+    fi
 fi
 
 
