@@ -1,6 +1,19 @@
+# 🚨 This repository was archived 🚨
+
+After many months of inactivity, this repository has been archived for research purposes.
+
+Development of this driver continues in [@mr-manuel's](https://github.com/mr-manuel) repository, which can be found here: [github.com/mr-manuel/venus-os_dbus-serialbattery](https://github.com/mr-manuel/venus-os_dbus-serialbattery)
+
+Many thanks to all the users who have used this driver.
+
+Greetings,<br>
+dbus-serialbattery Team
+
+-----
+
 # dbus-serialbattery
 
-This driver is for Venus OS devices (any GX device sold by Victron or a Raspberry Pi running the Venus OS image).
+The driver will communicate with a Battery Management System (BMS) that support serial (RS232, RS485 or TTL UART) and Bluetooth communication (see [BMS feature comparison](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/features#bms-feature-comparison) for details). The data is then published to the Venus OS system (dbus). The main purpose is to act as a Battery Monitor in your GX and supply State of Charge (SoC) and other values to the inverter/charger.
 
 The driver will communicate with a Battery Management System (BMS) that support serial (RS232, RS485 or TTL UART) and Bluetooth communication (see [BMS feature comparison](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/features#bms-feature-comparison) for details). The data is then published to the Venus OS system (dbus). The main purpose is to act as a Battery Monitor in your GX and supply State of Charge (SoC) and other values to the inverter/charger.
 
@@ -8,7 +21,12 @@ The driver will communicate with a Battery Management System (BMS) that support 
 
 The first version of this driver was released by [Louisvdw](https://github.com/Louisvdw/dbus-serialbattery) in September 2020.
 
-In February 2023 I ([mr-manuel](https://github.com/mr-manuel)) made my first PR, since Louis did not have time anymore to contribute to this project.
+* [Introduction](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/)
+* [Features](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/features)
+* [Supported BMS](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/supported-bms)
+* [How to install, update, disable, enable and uninstall](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/install)
+* [How to troubleshoot](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/troubleshoot/)
+* [FAQ](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/faq/)
 
 With the release of `v1.0.0` I became the main developer of this project. From then on, I have been maintaining the project and developing it further. I'm also solving 99% of the issues on GitHub.
 
