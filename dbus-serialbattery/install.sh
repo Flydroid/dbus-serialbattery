@@ -411,8 +411,8 @@ if [ "$version" = "local_repo" ]; then
     fi
 
     # copy local folder to /data/apps
-    if [ -d "$(dirname "$0")/dbus-serialbattery" ]; then
-        cp -a "$(dirname "$0")/dbus-serialbattery" /data/apps/
+    if [ -d "/dbus-serialbattery" ]; then
+        cp -a "/dbus-serialbattery" /data/apps/
     else
         echo "ERROR: Local dbus-serialbattery folder not found next to install.sh"
         restore_config
