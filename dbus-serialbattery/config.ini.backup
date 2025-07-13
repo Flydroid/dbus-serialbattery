@@ -1,0 +1,18 @@
+# Minimal config for CSBI CAN testing
+[DEFAULT]
+; Set logging level to see detailed info
+LOGGING = INFO
+
+; Explicitly enable CSBI CAN BMS type
+BMS_TYPE = Csbi_Can
+
+; Cell count - let BMS auto-detect
+; CELL_COUNT = 24
+
+; Voltage limits for 24S LiFePO4 pack  
+MAX_BATTERY_VOLTAGE = 87.6
+MIN_BATTERY_VOLTAGE = 67.2
+
+; Current limits (adjust as needed)
+MAX_BATTERY_CHARGE_CURRENT = 100
+MAX_BATTERY_DISCHARGE_CURRENT = 100
