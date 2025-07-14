@@ -356,6 +356,9 @@ class Battery(ABC):
         self.linear_ccl_last_set: int = 0
         self.linear_dcl_last_set: int = 0
 
+        # Parallel modules configuration
+        self.parallel_modules: int = 2  # Number of parallel half-modules (default: 2 for 2P12S configuration)
+
         # Needed for history calculation
         self.full_discharge_active: bool = False
         """
@@ -552,11 +555,11 @@ class Battery(ABC):
         if self.cell_count is not None:
             # set min battery voltage once
             if self.min_battery_voltage is None:
-                self.min_battery_voltage = round(utils.MIN_CELL_VOLTAGE * self.cell_count, 2)
+                self.min_battery_voltage = round(utils.MIN_CELL_VOLTAGE * self.cell_count, 2) / self.parallel_modules
 
             # set max battery voltage once
             if self.max_battery_voltage is None:
-                self.max_battery_voltage = round(utils.MAX_CELL_VOLTAGE * self.cell_count, 2)
+                self.max_battery_voltage = round(utils.MAX_CELL_VOLTAGE * self.cell_count, 2) / self.parallel_modules
         else:
             logger.debug("Cell count is not known yet. Can't set min and max battery voltage.")
 
@@ -569,7 +572,7 @@ class Battery(ABC):
             self.manage_charge_voltage_limit()
         # apply fixed charging voltage
         else:
-            self.control_voltage = round(self.max_battery_voltage, 2)
+            self.control_voltage = round(self.max_battery_voltage, 2)  # battery voltage is already divided by parallel_modules, so no need to divide again
             self.charge_mode = "Keep always max voltage"
 
     def soc_calculation(self) -> float:
@@ -649,12 +652,12 @@ class Battery(ABC):
         ):
             self.soc_reset_requested = True
 
-        self.soc_reset_battery_voltage = round(utils.SOC_RESET_VOLTAGE * self.cell_count, 2)
+        self.soc_reset_battery_voltage = round(utils.SOC_RESET_VOLTAGE * self.cell_count, 2) / self.parallel_modules
 
         if self.soc_reset_requested:
             self.max_battery_voltage = self.soc_reset_battery_voltage
         else:
-            self.max_battery_voltage = round(utils.MAX_CELL_VOLTAGE * self.cell_count, 2)
+            self.max_battery_voltage = round(utils.MAX_CELL_VOLTAGE * self.cell_count, 2) / self.parallel_modules
 
     def manage_charge_voltage_limit(self) -> None:
         """
@@ -670,7 +673,7 @@ class Battery(ABC):
             penalty_sum = 0
 
         try:
-            voltage_sum = self.get_cell_voltage_sum()
+            voltage_sum = self.get_cell_voltage_sum() / self.parallel_modules
             voltage_cell_diff = self.get_max_cell_voltage() - self.get_min_cell_voltage()
 
             if self.max_voltage_start_time is None:
@@ -800,7 +803,7 @@ class Battery(ABC):
 
             # Float mode
             else:
-                float_voltage = round((utils.FLOAT_CELL_VOLTAGE * self.cell_count), 2)
+                float_voltage = round((utils.FLOAT_CELL_VOLTAGE * self.cell_count), 2) / self.parallel_modules
                 charge_mode = "Float"
 
                 # reset bulk when going into float
@@ -921,7 +924,7 @@ class Battery(ABC):
                 )
 
         except TypeError:
-            self.control_voltage = round((utils.FLOAT_CELL_VOLTAGE * self.cell_count), 2)
+            self.control_voltage = round((utils.FLOAT_CELL_VOLTAGE * self.cell_count), 2) / self.parallel_modules
             self.charge_mode = "Error, please check the logs!"
 
             # set error code, to show in the GUI that something is wrong
@@ -2228,7 +2231,7 @@ class Battery(ABC):
         if "discharged_energy" not in self.history.exclude_values_to_calculate:
             if self.history.discharged_energy is None:
                 self.history.discharged_energy = (
-                    utils.FLOAT_CELL_VOLTAGE * self.cell_count * self.capacity * self.history.charge_cycles / 1000
+                    utils.FLOAT_CELL_VOLTAGE * self.cell_count * self.capacity * self.history.charge_cycles / 1000 / self.parallel_modules
                     if self.history.charge_cycles is not None
                     else 0
                 )
@@ -2240,7 +2243,7 @@ class Battery(ABC):
         if "charged_energy" not in self.history.exclude_values_to_calculate:
             if self.history.charged_energy is None:
                 self.history.charged_energy = (
-                    utils.FLOAT_CELL_VOLTAGE * self.cell_count * self.capacity * self.history.charge_cycles / 1000
+                    utils.FLOAT_CELL_VOLTAGE * self.cell_count * self.capacity * self.history.charge_cycles / 1000 / self.parallel_modules
                     if self.history.charge_cycles is not None
                     else 0
                 )
