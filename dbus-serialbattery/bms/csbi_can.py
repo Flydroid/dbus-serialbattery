@@ -165,7 +165,7 @@ class Csbi_Can(Battery):
                     
         # Update cell count and total voltage
         self.cell_count = len(self.cells)
-        self.voltage = self.get_cell_voltage_sum()
+        self.voltage = self.get_cell_voltage_sum()/2 # the module is made up of 2 halfmodules, so we divide the total voltage by 2
 
     def update_temperatures_from_frame(self, frame_type, data):
         """
