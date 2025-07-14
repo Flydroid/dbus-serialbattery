@@ -874,7 +874,7 @@ class Battery(ABC):
                     + (f" • penalty_sum: {penalty_sum:.3f} V" if utils.CVL_CONTROLLER_MODE == 1 else "")
                     + "\n"
                     + f"soc: {self.soc}% • soc_calc: {self.soc_calc}%\n"
-                    + f"current: {self.current:.2f}A"
+                    + (f"current: {self.current:.2f}A" if self.current is not None else "current: None A")
                     + (f" • current_calc: {self.current_calc:.2f} A\n" if self.current_calc is not None else "\n")
                     + f"current_time: {current_time}\n"
                     + f"linear_cvl_last_set: {self.linear_cvl_last_set}\n"
