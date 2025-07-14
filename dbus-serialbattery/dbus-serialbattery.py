@@ -44,7 +44,6 @@ from bms.pace import Pace
 from bms.renogy import Renogy
 from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
-from bms.csbi_can import Csbi_Can
 
 # add ext folder to sys.path
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
@@ -75,7 +74,6 @@ supported_bms_types = [
     {"bms": Renogy, "baud": 9600, "address": b"\xf7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
     {"bms": Seplosv3, "baud": 19200},
-    {"bms": Csbi_Can, "baud": 500000},
 ]
 
 # enabled only if explicitly set in config under "BMS_TYPE"
@@ -364,12 +362,14 @@ def main():
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can
         from bms.ubms_can import Ubms_Can
+        from bms.csbi_can import Csbi_Can
 
         # only try CAN BMS on CAN port
         supported_bms_types = [
             {"bms": Daly_Can},
             {"bms": Jkbms_Can},
             {"bms": Ubms_Can},
+            {"bms": Csbi_Can},
         ]
 
         # check if BMS_TYPE is not empty and all BMS types in the list are supported
