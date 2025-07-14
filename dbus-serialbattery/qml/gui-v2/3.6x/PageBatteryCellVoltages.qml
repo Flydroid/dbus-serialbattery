@@ -65,7 +65,7 @@ Page {
 
 							QuantityLabel {
 								width: parent.width
-								value: cellSum.value ?? NaN
+								value: (cellSum.value/2) ?? NaN
 								unit: VenusOS.Units_Volt_DC
 								precision: 3
 								font.pixelSize: 22
