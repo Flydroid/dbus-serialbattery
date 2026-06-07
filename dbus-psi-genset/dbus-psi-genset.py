@@ -48,6 +48,24 @@ DRIVER_VERSION = "0.1.0"
 PRODUCT_ID = 0xFFFF  # generic / unassigned
 THRESHOLD_NAMES = ("LVD", "LVDR", "HVDR", "HVD")
 
+# Live measurement/status paths. They are cleared to None (D-Bus "invalid", so
+# the GX shows no value) whenever the inverter is unreachable, so stale readings
+# are never displayed alongside /Connected = 0.
+DYNAMIC_PATHS = (
+    "/Ac/L1/Voltage",
+    "/Ac/L1/Current",
+    "/Ac/L1/Power",
+    "/Ac/Power",
+    "/Dc/0/Voltage",
+    "/Dc/0/Current",
+    "/Dc/0/Power",
+    "/StarterVoltage",
+    "/Engine/WindingTemperature",
+    "/Engine/CoolantTemperature",
+    "/StatusCode",
+    "/Error/0/Id",
+)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("dbus-psi-genset")
 
@@ -196,13 +214,22 @@ class PsiGensetService:
 
     # -- polling -----------------------------------------------------------
 
+    def _clear_values(self):
+        """Invalidate all live paths so the GX shows no data when offline."""
+        for path in DYNAMIC_PATHS:
+            self.service[path] = None
+
     def update(self):
         try:
             data = self.psi.read_realtime()
             status = self.psi.read_status()
         except Exception as exc:  # noqa: BLE001
             logger.warning("read failed: %s", exc)
-            self.service["/Connected"] = 0
+            # Only act on the transition to offline: zero /Connected and blank
+            # the live values once, instead of re-writing them every cycle.
+            if self.service["/Connected"] != 0:
+                self.service["/Connected"] = 0
+                self._clear_values()
             return True
 
         s = self.service
