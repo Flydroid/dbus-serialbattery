@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# runit service for the PSI genset driver. Edit TTY below to match the serial
+# port your USB-RS485 adapter enumerates as (or have install.sh substitute it).
+
+trap 'kill -TERM $PID' TERM INT
+
+exec 2>&1
+exec bash /data/apps/dbus-psi-genset/start-psi-genset.sh /dev/TTY &
+
+PID=$!
+wait $PID
+exit $?
