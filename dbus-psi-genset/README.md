@@ -46,9 +46,26 @@ python3 -m pytest test/
 ## Install on Venus OS
 
 ```
-cp config.sample.ini config.ini   # then edit baudrate / address / thresholds
-./install.sh ttyUSB0              # bind the service to your serial port
+./install.sh                                   # copies to /data/apps, runs enable.sh
+nano /data/apps/dbus-psi-genset/config.ini     # set PORT, baudrate, address, thresholds
+/data/apps/dbus-psi-genset/enable.sh           # apply config changes
 ```
+
+`install.sh` copies the driver to `/data/apps/dbus-psi-genset` (on the
+persistent partition) and runs `enable.sh`, which creates the runit service and
+registers a hook in `/data/rc.local`.
+
+### Surviving firmware updates
+
+A Venus OS firmware update reflashes the root filesystem, wiping `/service`,
+but the `/data` partition is preserved. Because `enable.sh` registers itself in
+`/data/rc.local` (which runs on every boot, including the first boot after an
+update), the service is **recreated automatically** after a firmware update —
+no manual reinstall needed. You only re-run the installer to change the driver
+*version*.
+
+Remove the boot hook and service with `./disable.sh` (driver files in
+`/data/apps` are kept).
 
 Logs: `tail -f /var/log/dbus-psi-genset/current | tai64nlocal`
 

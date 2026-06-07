@@ -1,9 +1,8 @@
 #!/bin/bash
 
-# Start the PSI genset driver. The serial port is provided as the first
-# argument (e.g. by the runit service below), defaulting to /dev/ttyUSB0.
+# Start the PSI genset driver. An optional serial port may be passed as the
+# first argument; otherwise the driver reads PORT from config.ini.
 
 DRIVER_DIR="$(cd "$(dirname "$0")" && pwd)"
-PORT="${1:-/dev/ttyUSB0}"
 
-exec python3 "$DRIVER_DIR/dbus-psi-genset.py" "$PORT"
+exec python3 "$DRIVER_DIR/dbus-psi-genset.py" "$@"
