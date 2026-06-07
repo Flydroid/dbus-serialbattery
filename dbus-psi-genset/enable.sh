@@ -38,4 +38,8 @@ grep -qxF "$hook" "$filename" || echo "$hook" >> "$filename"
 # up the new symlink within a few seconds and start it.
 [ -e "$SVC/supervise" ] && svc -t "$SVC" 2>/dev/null
 
+# install / refresh the custom genset GUI page on the local display (gui-v2).
+# Safe no-op if gui-v2 is absent or the version doesn't match.
+bash "$DEST/custom-gui-install.sh"
+
 echo "dbus-psi-genset enabled (service $SVC, serial port read from $DEST/config.ini)."

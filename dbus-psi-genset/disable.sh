@@ -21,4 +21,7 @@ fi
 # kill the driver if still running
 pkill -f "dbus-psi-genset.py" 2>/dev/null
 
+# restore the stock genset GUI page
+bash "$DEST/custom-gui-uninstall.sh"
+
 echo "dbus-psi-genset disabled. Driver files remain in $DEST."

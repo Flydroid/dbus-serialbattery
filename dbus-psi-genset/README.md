@@ -69,6 +69,33 @@ Remove the boot hook and service with `./disable.sh` (driver files in
 
 Logs: `tail -f /var/log/dbus-psi-genset/current | tai64nlocal`
 
+## Custom GUI (local display)
+
+The stock genset device page shows AC output, status and the starter voltage,
+but **not** the DC input current/power, and it has no menu for the cutoff
+thresholds. `enable.sh` therefore also runs `custom-gui-install.sh`, which
+patches the gui-v2 genset page on the **local display / Remote Console** to add:
+
+- a **"DC input"** row showing `/Dc/0/Voltage`, `/Dc/0/Current`, `/Dc/0/Power`;
+- an editable **"DC cutoff thresholds"** sub-page for LVD/LVDR/HVDR/HVD.
+
+Notes and limitations:
+
+- **Local display only.** The VRM web app is a separately compiled WASM build
+  and is not patched — those two extra items won't appear there.
+- **Targets Venus OS v3.5x.** The shipped QML
+  (`qml/gui-v2/3.5x/PageGensetModel.qml`) is the upstream v3.50 genset page plus
+  the two additive blocks. `custom-gui-install.sh` refuses to patch a file that
+  doesn't look like the v3.5x page, so a mismatched Venus version is a safe
+  no-op rather than a broken GUI. After a **major** Venus OS upgrade, regenerate
+  the QML for the new version.
+- The **cutoff menu only appears when `MANAGE_THRESHOLDS = true`** in
+  `config.ini` (that is what makes the driver publish the `/Settings/*` paths the
+  menu binds to). The "DC input" row is always shown.
+- The patch is re-applied on every boot (firmware-update proof) and reverted by
+  `disable.sh` / `custom-gui-uninstall.sh`, which restore the backed-up stock
+  page and restart the GUI.
+
 ## D-Bus paths published
 
 | Path | Meaning |

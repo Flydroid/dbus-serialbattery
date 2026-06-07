@@ -45,7 +45,10 @@ import psi  # noqa: E402
 from psi import PsiInverter  # noqa: E402
 
 DRIVER_VERSION = "0.1.0"
-PRODUCT_ID = 0xFFFF  # generic / unassigned
+# Victron "Virtual AC genset" product id. Using a recognised genset product id
+# makes the GX GUI render the proper genset device page (PageGensetModel)
+# instead of falling back to a generic AC-input page.
+PRODUCT_ID = 0xC06B
 THRESHOLD_NAMES = ("LVD", "LVDR", "HVDR", "HVD")
 
 # Live measurement/status paths. They are cleared to None (D-Bus "invalid", so
